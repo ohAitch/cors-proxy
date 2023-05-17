@@ -6,6 +6,8 @@ var express = require('express'),
 var myLimit = typeof(process.argv[2]) != 'undefined' ? process.argv[2] : '100kb';
 console.log('Using limit: ', myLimit);
 
+if(!process.env.CORS_PROXY_PASSWORD) throw Error("No password configured")
+
 app.use(bodyParser.json({limit: myLimit}));
 
 app.all('*', function (req, res, next) {
@@ -24,7 +26,13 @@ app.all('*', function (req, res, next) {
             res.send(500, { error: 'There is no Target-Endpoint header in the request' });
             return;
         }
-        request({ url: targetURL + req.url, method: req.method, json: req.body, headers: {'Authorization': req.header('Authorization')} },
+        var proxyPassword = req.header('X-Proxy-Authorization');
+        if (!proxyPassword || proxyPassword != process.env.CORS_PROXY_PASSWORD) {
+            res.send(500, { error: 'Please set correct X-Proxy-Authorization header' });
+            return;
+        }
+        
+        request({ url: targetURL + req.url, method: req.method, json: req.body, req.getHeaders()},
             function (error, response, body) {
                 if (error) {
                     console.error('error: ' + response.statusCode)
